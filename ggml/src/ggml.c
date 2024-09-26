@@ -19127,9 +19127,10 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 // dump the data
                 // TODO: pad this to 32 byte boundary
                 {
-                    const size_t size = ggml_nbytes(tensor);
+                    // derefs a null ptr...
+                    // const size_t size = ggml_nbytes(tensor);
 
-                    fwrite(tensor->data, sizeof(char), size, fout);
+                    // fwrite(tensor->data, sizeof(char), size, fout);
                 }
             }
         }
