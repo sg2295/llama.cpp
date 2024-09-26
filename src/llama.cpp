@@ -7753,10 +7753,9 @@ static struct ggml_tensor * llm_build_inp_embd(
         lctx.inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, batch.n_tokens);
         cb(lctx.inp_tokens, "inp_tokens", -1);
         ggml_set_input(lctx.inp_tokens);
-
         inpL = ggml_get_rows(ctx, tok_embd, lctx.inp_tokens);
     } else {
-       lctx.inp_embd = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, batch.n_tokens);
+        lctx.inp_embd = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, batch.n_tokens);
         inpL = lctx.inp_embd;
         ggml_set_input(lctx.inp_embd);
     }
@@ -13925,6 +13924,11 @@ static struct ggml_cgraph * llama_build_graph(
     }
 
     llm.free();
+
+    static unsigned count = 0;
+    std::string fname = "graph_dumps/model_name/graph_" + std::to_string(count) + ".ggml";
+    ggml_graph_export(result, fname.c_str());
+    count++;
 
     return result;
 }
