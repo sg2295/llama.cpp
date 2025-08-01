@@ -12,6 +12,9 @@
 #include <limits>
 #include <stdexcept>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 //
 // llama_context
 //
@@ -1385,6 +1388,22 @@ ggml_cgraph * llama_context::graph_reserve(uint32_t n_tokens, uint32_t n_seqs, u
     res->reset();
 
     auto * gf = model.build_graph(gparams);
+
+    // Create dump dirs if they don't already exist...
+    std::string const graph_dumps_dir = "../graph_dumps/";
+    std::string const graph_dumps_dir_llm = graph_dumps_dir + "llm/";
+    char const * graph_dumps_dir_cstr = graph_dumps_dir.c_str();
+    char const * graph_dumps_dir_llm_cstr = graph_dumps_dir_llm.c_str();
+    struct stat st{};
+
+    if (stat(graph_dumps_dir_cstr, &st) == -1) mkdir(graph_dumps_dir_cstr, 0755);
+    if (stat(graph_dumps_dir_llm_cstr, &st) == -1) mkdir(graph_dumps_dir_llm_cstr, 0755);
+
+    // Dump graph
+    static unsigned count = 0;
+    std::string fname = graph_dumps_dir_llm + std::string("graph_") + std::to_string(count) + std::string(".ggml");
+    ggml_graph_export(gf, fname.c_str());
+    ++count;
 
     this->n_outputs = save_n_outputs;
 

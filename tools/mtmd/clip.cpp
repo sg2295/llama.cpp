@@ -28,6 +28,9 @@
 #include <numeric>
 #include <functional>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 struct clip_logger_state g_logger_state = {GGML_LOG_LEVEL_CONT, clip_log_callback_default, NULL};
 
 enum ffn_op_type {
@@ -2007,6 +2010,22 @@ static ggml_cgraph * clip_image_build_graph(clip_ctx * ctx, const clip_image_f32
                 res = graph.build_llava();
             } break;
     }
+
+    // Create dump dirs if they don't already exist...
+    std::string const graph_dumps_dir = "../graph_dumps/";
+    std::string const graph_dumps_dir_clip = graph_dumps_dir + "clip/";
+    char const * graph_dumps_dir_cstr = graph_dumps_dir.c_str();
+    char const * graph_dumps_dir_clip_cstr = graph_dumps_dir_clip.c_str();
+
+    struct stat st{};
+    if (stat(graph_dumps_dir_cstr, &st) == -1) mkdir(graph_dumps_dir_cstr, 0755);
+    if (stat(graph_dumps_dir_clip_cstr, &st) == -1) mkdir(graph_dumps_dir_clip_cstr, 0755);
+
+    // Dump graph
+    static unsigned count = 0;
+    std::string fname = graph_dumps_dir_clip + std::string("graph_") + std::to_string(count) + std::string(".ggml");
+    ggml_graph_export(res, fname.c_str());
+    ++count;
     return res;
 }
 

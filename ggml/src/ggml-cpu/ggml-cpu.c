@@ -1101,6 +1101,56 @@ void ggml_set_f32_nd(const struct ggml_tensor * tensor, int i0, int i1, int i2, 
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static void exp_ggml_print_tensor(uint8_t * data, enum ggml_type type, const int64_t * ne, const size_t * nb, int64_t n) {
+    GGML_ASSERT(n > 0);
+    printf("(%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 ")\n", ne[0], ne[1], ne[2], ne[3]);
+    printf("[\n");
+    for (int64_t i3 = 0; i3 < ne[3]; i3++) {
+        printf("  [\n");
+        for (int64_t i2 = 0; i2 < ne[2]; i2++) {
+            // if (i2 == n && ne[2] > 2*n) {
+            //     printf("                                      ..., \n");
+            //     i2 = ne[2] - n;
+            // }
+            printf("    [\n");
+            for (int64_t i1 = 0; i1 < ne[1]; i1++) {
+                // if (i1 == n && ne[1] > 2*n) {
+                //     printf("                                       ..., \n");
+                //     i1 = ne[1] - n;
+                // }
+                printf("      [");
+                for (int64_t i0 = 0; i0 < ne[0]; i0++) {
+                    // if (i0 == n && ne[0] > 2*n) {
+                    //     printf("..., ");
+                    //     i0 = ne[0] - n;
+                    // }
+                    size_t i = i3 * nb[3] + i2 * nb[2] + i1 * nb[1] + i0 * nb[0];
+                    float v;
+                    if (type == GGML_TYPE_F16) {
+                        v = ggml_fp16_to_fp32(*(ggml_fp16_t *) &data[i]);
+                    } else if (type == GGML_TYPE_F32) {
+                        v = *(float *) &data[i];
+                    } else if (type == GGML_TYPE_I32) {
+                        v = (float) *(int32_t *) &data[i];
+                    } else if (type == GGML_TYPE_I16) {
+                        v = (float) *(int16_t *) &data[i];
+                    } else if (type == GGML_TYPE_I8) {
+                        v = (float) *(int8_t *) &data[i];
+                    } else {
+                        GGML_ABORT("fatal error");
+                    }
+                    printf("%12.8f", (double)v);
+                    if (i0 < ne[0] - 1) printf(", ");
+                }
+            printf("     ],\n");
+            }
+            printf("    ],\n");
+        }
+        printf("  ],\n");
+    }
+    printf("]\n");
+}
+
 // ggml_compute_forward_mul_mat
 
 static void ggml_compute_forward_mul_mat_one_chunk(
