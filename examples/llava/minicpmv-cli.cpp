@@ -115,6 +115,10 @@ static bool eval_id(struct llama_context * ctx_llama, int id, int * n_past) {
 static bool eval_string(struct llama_context * ctx_llama, const char* str, int n_batch, int * n_past, bool add_bos){
     std::string              str2     = str;
     std::vector<llama_token> embd_inp = common_tokenize(ctx_llama, str2, add_bos, true);
+    std::cout << "Tokenizer input: " << str << std::endl;
+    std::cout << "Tokens:";
+    for (size_t i = 0; i < embd_inp.size(); ++i) std::cout << " " << embd_inp[i];
+    std::cout << std::endl;
     return eval_tokens(ctx_llama, embd_inp, n_batch, n_past);
 }
 

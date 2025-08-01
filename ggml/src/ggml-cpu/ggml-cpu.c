@@ -12718,6 +12718,56 @@ static void ggml_compute_forward_opt_step_adamw(
 }
 /////////////////////////////////
 
+static void exp_ggml_print_tensor(uint8_t * data, enum ggml_type type, const int64_t * ne, const size_t * nb, int64_t n) {
+    GGML_ASSERT(n > 0);
+    printf("(%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 ")\n", ne[0], ne[1], ne[2], ne[3]);
+    printf("[\n");
+    for (int64_t i3 = 0; i3 < ne[3]; i3++) {
+        printf("  [\n");
+        for (int64_t i2 = 0; i2 < ne[2]; i2++) {
+            // if (i2 == n && ne[2] > 2*n) {
+            //     printf("                                      ..., \n");
+            //     i2 = ne[2] - n;
+            // }
+            printf("    [\n");
+            for (int64_t i1 = 0; i1 < ne[1]; i1++) {
+                // if (i1 == n && ne[1] > 2*n) {
+                //     printf("                                       ..., \n");
+                //     i1 = ne[1] - n;
+                // }
+                printf("      [");
+                for (int64_t i0 = 0; i0 < ne[0]; i0++) {
+                    // if (i0 == n && ne[0] > 2*n) {
+                    //     printf("..., ");
+                    //     i0 = ne[0] - n;
+                    // }
+                    size_t i = i3 * nb[3] + i2 * nb[2] + i1 * nb[1] + i0 * nb[0];
+                    float v;
+                    if (type == GGML_TYPE_F16) {
+                        v = ggml_fp16_to_fp32(*(ggml_fp16_t *) &data[i]);
+                    } else if (type == GGML_TYPE_F32) {
+                        v = *(float *) &data[i];
+                    } else if (type == GGML_TYPE_I32) {
+                        v = (float) *(int32_t *) &data[i];
+                    } else if (type == GGML_TYPE_I16) {
+                        v = (float) *(int16_t *) &data[i];
+                    } else if (type == GGML_TYPE_I8) {
+                        v = (float) *(int8_t *) &data[i];
+                    } else {
+                        GGML_ABORT("fatal error");
+                    }
+                    printf("%12.8f", (double)v);
+                    if (i0 < ne[0] - 1) printf(", ");
+                }
+            printf("     ],\n");
+            }
+            printf("    ],\n");
+        }
+        printf("  ],\n");
+    }
+    printf("]\n");
+}
+
 static void ggml_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor) {
     GGML_ASSERT(params);
 
@@ -12735,15 +12785,29 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_ADD:
             {
+                // if (strcmp(tensor->src[1]->name, "pos_embed") == 0) {
+                //     printf("pos_embed\n");
+                //     exp_ggml_print_tensor(tensor->src[1]->data, tensor->src[1]->type, tensor->src[1]->ne, tensor->src[1]->nb, 3);
+                // }
+                // printf("add src1\n");
+                // exp_ggml_print_tensor(tensor->src[1]->data, tensor->src[1]->type, tensor->src[1]->ne, tensor->src[1]->nb, 3);
                 ggml_compute_forward_add(params, tensor);
-            } break;
+                // printf("add output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
+             } break;
         case GGML_OP_ADD1:
             {
                 ggml_compute_forward_add1(params, tensor);
+                // printf("add1 output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
             } break;
         case GGML_OP_ACC:
             {
+                // printf("acc src1\n");
+                // exp_ggml_print_tensor(tensor->src[1]->data, tensor->src[1]->type, tensor->src[1]->ne, tensor->src[1]->nb, 3);
                 ggml_compute_forward_acc(params, tensor);
+                // printf("acc output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
             } break;
         case GGML_OP_SUB:
             {
@@ -12815,12 +12879,23 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_NORM:
             {
+                // if (tensor->ne[1] == 64) {
+                //     printf("norm src0\n");
+                //     exp_ggml_print_tensor(tensor->src[0]->data, tensor->src[0]->type, tensor->src[0]->ne, tensor->src[0]->nb, 3);
+                //     exit(0);
+                // }
                 ggml_compute_forward_norm(params, tensor);
+                // printf("norm output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
             } break;
         case GGML_OP_RMS_NORM:
             {
+                if (strcmp(tensor->src[0]->name, "inp_embd") == 0) {
+                    printf("inp_embd\n");
+                    exp_ggml_print_tensor(tensor->src[0]->data, tensor->src[0]->type, tensor->src[0]->ne, tensor->src[0]->nb, 3);
+                }
                 ggml_compute_forward_rms_norm(params, tensor);
-            } break;
+             } break;
         case GGML_OP_RMS_NORM_BACK:
             {
                 ggml_compute_forward_rms_norm_back(params, tensor);
@@ -12832,6 +12907,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_MUL_MAT:
             {
                 ggml_compute_forward_mul_mat(params, tensor);
+                // if (strcmp(tensor->name, "result_output") == 0) {
+                //     printf("result_output\n");
+                //     exp_ggml_print_tensor(tensor->src[1]->data, tensor->src[1]->type, tensor->src[1]->ne, tensor->src[1]->nb, 3);
+                //     exit(0);
+                // }
             } break;
         case GGML_OP_MUL_MAT_ID:
             {
@@ -12844,6 +12924,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_SCALE:
             {
                 ggml_compute_forward_scale(params, tensor);
+                // if (tensor->ne[1] == 64) {
+                //     printf("scale output\n");
+                //     exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
+                //     exit(0);
+                // }
             } break;
         case GGML_OP_SET:
             {
@@ -12868,6 +12953,8 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_PERMUTE:
             {
                 ggml_compute_forward_permute(params, tensor);
+                // printf("permute output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
             } break;
         case GGML_OP_TRANSPOSE:
             {
@@ -12875,7 +12962,13 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_GET_ROWS:
             {
+                // printf("get_rows src0\n");
+                // exp_ggml_print_tensor(tensor->src[0]->data, tensor->src[0]->type, tensor->src[0]->ne, tensor->src[0]->nb, 3);
+                // printf("get_rows src1\n");
+                // exp_ggml_print_tensor(tensor->src[1]->data, tensor->src[1]->type, tensor->src[1]->ne, tensor->src[1]->nb, 3);
                 ggml_compute_forward_get_rows(params, tensor);
+                // printf("get_rows output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
             } break;
         case GGML_OP_GET_ROWS_BACK:
             {
@@ -12919,6 +13012,8 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_IM2COL:
             {
+                // printf("im2col src1\n");
+                // exp_ggml_print_tensor(tensor->src[1]->data, tensor->src[1]->type, tensor->src[1]->ne, tensor->src[1]->nb, 3);
                 ggml_compute_forward_im2col(params, tensor);
             } break;
         case GGML_OP_IM2COL_BACK:
@@ -12964,6 +13059,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_ARGSORT:
             {
                 ggml_compute_forward_argsort(params, tensor);
+                // if (strcmp(tensor->name, "ffn_moe_argsort-14") == 0) {
+                //     printf("temp\n");
+                //     exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
+                //     exit(0);
+                // }
             } break;
         case GGML_OP_LEAKY_RELU:
             {
@@ -12998,7 +13098,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_UNARY:
             {
+                // printf("unary input\n");
+                // exp_ggml_print_tensor(tensor->src[0]->data, tensor->src[0]->type, tensor->src[0]->ne, tensor->src[0]->nb, 3);
                 ggml_compute_forward_unary(params, tensor);
+                // printf("unary output\n");
+                // exp_ggml_print_tensor(tensor->data, tensor->type, tensor->ne, tensor->nb, 3);
             } break;
         case GGML_OP_GET_REL_POS:
             {

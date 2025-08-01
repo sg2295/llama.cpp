@@ -466,13 +466,49 @@ GGML_API float ggml_table_f32_f16[1 << 16];
 // so we define GGML_FP16_TO_FP32 and GGML_FP32_TO_FP16 elsewhere for NEON.
 // This is also true for POWER9.
 #if !defined(GGML_FP16_TO_FP32)
-inline static float ggml_lookup_fp16_to_fp32(ggml_fp16_t f) {
-    uint16_t s;
-    memcpy(&s, &f, sizeof(uint16_t));
-    return ggml_table_f32_f16[s];
+// inline static float ggml_lookup_fp16_to_fp32(ggml_fp16_t f) {
+//     uint16_t s;
+//     memcpy(&s, &f, sizeof(uint16_t));
+//     return ggml_table_f32_f16[s];
+// }
+
+static inline float ggml_compute_fp16_to_fp32(ggml_fp16_t h) {
+    uint32_t sign = (h & 0x8000) << 16;
+    uint32_t exponent = (h & 0x7C00) >> 10;
+    uint32_t fraction = h & 0x03FF;
+    uint32_t f;
+
+    if (exponent == 0) {
+        // Zero or subnormal
+        if (fraction == 0) {
+            f = sign;  // +/- zero
+        } else {
+            // Normalize the subnormal number
+            while ((fraction & 0x0400) == 0) {
+                fraction <<= 1;
+                exponent--;
+            }
+            exponent++;
+            fraction &= ~0x0400;
+            // Adjust exponent from half to float (bias: 15 -> 127)
+            exponent = exponent + (127 - 15);
+            f = sign | (exponent << 23) | (fraction << 13);
+        }
+    } else if (exponent == 0x1F) {
+        // Inf or NaN
+        f = sign | 0x7F800000 | (fraction << 13);
+    } else {
+        // Normalized number
+        exponent = exponent + (127 - 15);
+        f = sign | (exponent << 23) | (fraction << 13);
+    }
+
+    float result;
+    memcpy(&result, &f, sizeof(result));
+    return result;
 }
 
-#define GGML_FP16_TO_FP32(x) ggml_lookup_fp16_to_fp32(x)
+#define GGML_FP16_TO_FP32(x) ggml_compute_fp16_to_fp32(x)
 #endif
 
 #if !defined(GGML_FP32_TO_FP16)

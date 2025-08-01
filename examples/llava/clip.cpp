@@ -45,6 +45,9 @@
 #include <cinttypes>
 #include <limits>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #if defined(LLAVA_LOG_OFF)
 #   define LOG_INF(...)
 #   define LOG_WRN(...)
@@ -1815,6 +1818,38 @@ inline int clip(int x, int lower, int upper) {
     return std::max(lower, std::min(x, upper));
 }
 
+static void exp_print_uint8_image(const clip_image_u8 &img) {
+    printf("[\n");
+    for (int i = 0; i < img.ny; i++) {
+        printf("  [\n");
+        for (int j = 0; j < img.nx; j++) {
+            printf("    [");
+            for (int k = 0; k < 3; k++) {
+                printf("%d, ", img.buf[i * img.nx * 3 + j * 3 + k]);
+            }
+            printf("],\n");
+        }
+        printf("  ],\n");
+    }
+    printf("]\n");
+}
+
+static void exp_print_float32_image(const clip_image_f32 &img) {
+    printf("[\n");
+    for (int i = 0; i < img.ny; i++) {
+        printf("  [\n");
+        for (int j = 0; j < img.nx; j++) {
+            printf("    [");
+            for (int k = 0; k < 3; k++) {
+                printf("%f, ", img.buf[i * img.nx * 3 + j * 3 + k]);
+            }
+            printf("],\n");
+        }
+        printf("  ],\n");
+    }
+    printf("]\n");
+}
+
 static bool bicubic_resize(const clip_image_u8 &img, clip_image_u8 &dst, int target_width, int target_height) {
     const int nx = img.nx;
     const int ny = img.ny;
@@ -2561,6 +2596,23 @@ bool clip_image_batch_encode(clip_ctx * ctx, const int n_threads, const clip_ima
 
     // build the inference graph
     ggml_cgraph * gf = clip_image_build_graph(ctx, imgs, ctx->load_image_size, true);
+
+    // Create dump dirs if they don't already exist...
+    std::string const graph_dumps_dir = "../graph_dumps/";
+    std::string const graph_dumps_dir_clip = graph_dumps_dir + "clip/";
+    char const * graph_dumps_dir_cstr = graph_dumps_dir.c_str();
+    char const * graph_dumps_dir_clip_cstr = graph_dumps_dir_clip.c_str();
+
+    struct stat st{};
+    if (stat(graph_dumps_dir_cstr, &st) == -1) mkdir(graph_dumps_dir_cstr, 0755);
+    if (stat(graph_dumps_dir_clip_cstr, &st) == -1) mkdir(graph_dumps_dir_clip_cstr, 0755);
+
+    // Dump graph
+    static unsigned count = 0;
+    std::string fname = graph_dumps_dir_clip + std::string("graph_") + std::to_string(count) + std::string(".ggml");
+    ggml_graph_export(gf, fname.c_str());
+    ++count;
+
     ggml_gallocr_alloc_graph(ctx->compute_alloc, gf);
 
     // set inputs
